@@ -1,0 +1,9 @@
+# Screenshots Directory
+
+This directory is for storing app screenshots used in the README.
+
+To add screenshots:
+1. Take screenshots from the iOS Simulator (CMD+S)
+2. Name them appropriately (dashboard.png, log-entry.png, settings.png)
+3. Place them in this directory
+4. They will be automatically referenced by the README
