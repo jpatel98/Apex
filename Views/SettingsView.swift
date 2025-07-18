@@ -31,7 +31,6 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var users: [User]
     @StateObject private var authState = AuthenticationState()
-    @StateObject private var storeManager = StoreManager.shared
     
     @State private var showResetConfirmation = false
     @State private var isEditingProfile = false
@@ -41,7 +40,7 @@ struct SettingsView: View {
     @State private var notificationsEnabled = true
     @State private var alertTimeBefore = 30
     @State private var showAuthSheet = false
-    @State private var showPaywall = false
+    @State private var showUpgradeAlert = false
     
     var currentUser: User? {
         users.first(where: { $0.isOnboarded })
@@ -209,12 +208,12 @@ struct SettingsView: View {
                 
                 // Data Management Section
                 Section(header: Text("Data Management")) {
-                    if storeManager.hasAccess(to: .exportData) {
+                    if UserDefaults.isPremiumUser {
                         Button(action: exportData) {
                             Label("Export Data", systemImage: "square.and.arrow.up")
                         }
                     } else {
-                        Button(action: { showPaywall = true }) {
+                        Button(action: { showUpgradeAlert = true }) {
                             HStack {
                                 Label("Export Data", systemImage: "square.and.arrow.up")
                                 Spacer()
@@ -231,9 +230,9 @@ struct SettingsView: View {
                 }
                 
                 // Premium Section
-                if storeManager.currentTier == .free {
+                if !UserDefaults.isPremiumUser {
                     Section {
-                        Button(action: { showPaywall = true }) {
+                        Button(action: { showUpgradeAlert = true }) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 5) {
                                     HStack {
@@ -267,7 +266,7 @@ struct SettingsView: View {
                                 .foregroundColor(.yellow)
                             
                             VStack(alignment: .leading) {
-                                Text(storeManager.currentTier.displayName)
+                                Text("Apex Pro")
                                     .font(.headline)
                                 
                                 Text("Active subscription")
@@ -328,8 +327,14 @@ struct SettingsView: View {
             .sheet(isPresented: $showAuthSheet) {
                 AuthenticationView(authState: authState)
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
+            .alert("Upgrade to Pro", isPresented: $showUpgradeAlert) {
+                Button("Upgrade ($4.99/mo)") {
+                    // Simulate upgrade
+                    UserDefaults.isPremiumUser = true
+                }
+                Button("Maybe Later", role: .cancel) { }
+            } message: {
+                Text("Unlock unlimited history, data export, and advanced features.")
             }
             .onAppear {
                 loadUserData()

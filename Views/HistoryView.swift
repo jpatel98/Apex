@@ -1,17 +1,24 @@
 import SwiftUI
 import SwiftData
 
+// Simple premium feature check
+extension UserDefaults {
+    static var isPremiumUser: Bool {
+        get { UserDefaults.standard.bool(forKey: "isPremiumUser") }
+        set { UserDefaults.standard.set(newValue, forKey: "isPremiumUser") }
+    }
+}
+
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CaffeineEntry.timestamp, order: .reverse) private var allEntries: [CaffeineEntry]
-    @StateObject private var storeManager = StoreManager.shared
     
     @State private var selectedDate = Date()
-    @State private var showPaywall = false
+    @State private var showUpgradeAlert = false
     
     var entries: [CaffeineEntry] {
         // Free users only see last 7 days
-        if !storeManager.hasAccess(to: .unlimitedHistory) {
+        if !UserDefaults.isPremiumUser {
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
             return allEntries.filter { $0.timestamp >= sevenDaysAgo }
         }
@@ -32,12 +39,12 @@ struct HistoryView: View {
         NavigationView {
             VStack {
                 // Premium Banner for Free Users
-                if !storeManager.hasAccess(to: .unlimitedHistory) {
+                if !UserDefaults.isPremiumUser {
                     PremiumBanner(
                         message: "📈 Unlock unlimited history",
                         description: "See all your caffeine data beyond 7 days"
                     ) {
-                        showPaywall = true
+                        showUpgradeAlert = true
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
@@ -55,7 +62,7 @@ struct HistoryView: View {
                     }
                     
                     // Premium prompt at bottom for free users
-                    if !storeManager.hasAccess(to: .unlimitedHistory) && !sortedDates.isEmpty {
+                    if !UserDefaults.isPremiumUser && !sortedDates.isEmpty {
                         Section {
                             VStack(spacing: 10) {
                                 Image(systemName: "lock.fill")
@@ -71,7 +78,7 @@ struct HistoryView: View {
                                     .multilineTextAlignment(.center)
                                 
                                 Button("Upgrade Now") {
-                                    showPaywall = true
+                                    showUpgradeAlert = true
                                 }
                                 .buttonStyle(.borderedProminent)
                             }
@@ -83,8 +90,14 @@ struct HistoryView: View {
             }
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.large)
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
+            .alert("Upgrade to Pro", isPresented: $showUpgradeAlert) {
+                Button("Upgrade ($4.99/mo)") {
+                    // Simulate upgrade
+                    UserDefaults.isPremiumUser = true
+                }
+                Button("Maybe Later", role: .cancel) { }
+            } message: {
+                Text("Unlock unlimited history, data export, and advanced features.")
             }
         }
     }
