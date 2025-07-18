@@ -1,14 +1,45 @@
 import SwiftUI
 import SwiftData
 
+// Simple Authentication State
+class AuthenticationState: ObservableObject {
+    @Published var isAuthenticated = false
+    @Published var userEmail: String?
+    
+    init() {
+        // Check if user was previously authenticated
+        isAuthenticated = UserDefaults.standard.bool(forKey: "isAuthenticated")
+        userEmail = UserDefaults.standard.string(forKey: "userEmail")
+    }
+    
+    func signIn(email: String) {
+        isAuthenticated = true
+        userEmail = email
+        UserDefaults.standard.set(true, forKey: "isAuthenticated")
+        UserDefaults.standard.set(email, forKey: "userEmail")
+    }
+    
+    func signOut() {
+        isAuthenticated = false
+        userEmail = nil
+        UserDefaults.standard.set(false, forKey: "isAuthenticated")
+        UserDefaults.standard.removeObject(forKey: "userEmail")
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var users: [User]
+    @StateObject private var authState = AuthenticationState()
     
     @State private var showResetConfirmation = false
+    @State private var isEditingProfile = false
     @State private var selectedSensitivity: CaffeineSensitivity = .medium
     @State private var weightInput: String = ""
     @State private var useKg = true
+    @State private var notificationsEnabled = true
+    @State private var alertTimeBefore = 30
+    @State private var showAuthSheet = false
     
     var currentUser: User? {
         users.first(where: { $0.isOnboarded })
@@ -17,20 +48,125 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                // Authentication Section
+                Section {
+                    if !authState.isAuthenticated {
+                        Button(action: {
+                            showAuthSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading) {
+                                    Text("Sign In")
+                                        .font(.headline)
+                                    Text("Sync your data across devices")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    } else {
+                        HStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.green)
+                            VStack(alignment: .leading) {
+                                Text("Signed In")
+                                    .font(.headline)
+                                Text(authState.userEmail ?? "Unknown")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button("Sign Out") {
+                                authState.signOut()
+                            }
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        }
+                    }
+                }
+                
+                // Profile Section
                 Section(header: Text("Profile")) {
                     if let user = currentUser {
-                        HStack {
-                            Label("Weight", systemImage: "scalemass")
-                            Spacer()
-                            Text("\(Int(user.weightKg)) kg")
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        HStack {
-                            Label("Sensitivity", systemImage: "gauge")
-                            Spacer()
-                            Text(user.sensitivity.displayName)
-                                .foregroundColor(.secondary)
+                        if isEditingProfile {
+                            // Edit Mode
+                            HStack {
+                                Label("Weight", systemImage: "scalemass")
+                                Spacer()
+                                TextField("Weight", text: $weightInput)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 60)
+                                Picker("Unit", selection: $useKg) {
+                                    Text("kg").tag(true)
+                                    Text("lbs").tag(false)
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+                                .frame(width: 100)
+                            }
+                            
+                            VStack(alignment: .leading) {
+                                Label("Caffeine Sensitivity", systemImage: "gauge")
+                                    .padding(.bottom, 5)
+                                
+                                Picker("Sensitivity", selection: $selectedSensitivity) {
+                                    ForEach(CaffeineSensitivity.allCases, id: \.self) { sensitivity in
+                                        HStack {
+                                            Text(sensitivity.displayName)
+                                            Text(sensitivityDescription(sensitivity))
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .tag(sensitivity)
+                                    }
+                                }
+                                .pickerStyle(DefaultPickerStyle())
+                            }
+                            
+                            HStack {
+                                Button("Cancel") {
+                                    isEditingProfile = false
+                                    loadUserData()
+                                }
+                                .foregroundColor(.red)
+                                
+                                Spacer()
+                                
+                                Button("Save") {
+                                    saveProfileChanges()
+                                }
+                                .fontWeight(.semibold)
+                            }
+                        } else {
+                            // View Mode
+                            HStack {
+                                Label("Weight", systemImage: "scalemass")
+                                Spacer()
+                                Text("\(Int(user.weightKg)) kg")
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            HStack {
+                                Label("Sensitivity", systemImage: "gauge")
+                                Spacer()
+                                Text(user.sensitivity.displayName)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Button(action: {
+                                isEditingProfile = true
+                                loadUserData()
+                            }) {
+                                Label("Edit Profile", systemImage: "pencil")
+                            }
                         }
                         
                         Button(action: {
@@ -42,19 +178,46 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Notifications Section
                 Section(header: Text("Notifications")) {
-                    Toggle(isOn: .constant(true)) {
+                    Toggle(isOn: $notificationsEnabled) {
                         Label("Crash Alerts", systemImage: "bell")
                     }
+                    .onChange(of: notificationsEnabled) { oldValue, newValue in
+                        updateNotificationSettings()
+                    }
                     
-                    HStack {
-                        Label("Alert Time", systemImage: "clock")
-                        Spacer()
-                        Text("30 min before")
-                            .foregroundColor(.secondary)
+                    if notificationsEnabled {
+                        VStack(alignment: .leading) {
+                            Label("Alert Time", systemImage: "clock")
+                            
+                            Picker("Alert before crash", selection: $alertTimeBefore) {
+                                Text("15 minutes").tag(15)
+                                Text("30 minutes").tag(30)
+                                Text("45 minutes").tag(45)
+                                Text("1 hour").tag(60)
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .onChange(of: alertTimeBefore) { oldValue, newValue in
+                                updateNotificationSettings()
+                            }
+                        }
                     }
                 }
                 
+                // Data Management Section
+                Section(header: Text("Data Management")) {
+                    Button(action: exportData) {
+                        Label("Export Data", systemImage: "square.and.arrow.up")
+                    }
+                    
+                    Button(action: clearAllData) {
+                        Label("Clear All Data", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                // About Section
                 Section(header: Text("About")) {
                     HStack {
                         Text("Version")
@@ -63,30 +226,22 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Link(destination: URL(string: "https://example.com/privacy")!) {
+                    Link(destination: URL(string: "https://github.com/jpatel98/Apex")!) {
                         HStack {
-                            Text("Privacy Policy")
+                            Text("GitHub Repository")
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(.secondary)
                         }
                     }
                     
-                    Link(destination: URL(string: "https://example.com/terms")!) {
+                    Link(destination: URL(string: "https://github.com/jpatel98/Apex/blob/main/docs/METHODOLOGY.md")!) {
                         HStack {
-                            Text("Terms of Service")
+                            Text("Methodology")
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(.secondary)
                         }
-                    }
-                }
-                
-                Section {
-                    Button(action: clearAllData) {
-                        Text("Clear All Data")
-                            .foregroundColor(.red)
-                            .frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -99,7 +254,52 @@ struct SettingsView: View {
             } message: {
                 Text("This will reset your profile settings. Your caffeine history will be preserved.")
             }
+            .sheet(isPresented: $showAuthSheet) {
+                AuthenticationView(authState: authState)
+            }
+            .onAppear {
+                loadUserData()
+            }
         }
+    }
+    
+    private func loadUserData() {
+        guard let user = currentUser else { return }
+        selectedSensitivity = user.sensitivity
+        weightInput = String(Int(user.weightKg))
+        useKg = true
+    }
+    
+    private func saveProfileChanges() {
+        guard let user = currentUser else { return }
+        
+        if let weight = Double(weightInput) {
+            if useKg {
+                user.weightKg = weight
+            } else {
+                // Convert lbs to kg
+                user.weightKg = weight * 0.453592
+            }
+        }
+        
+        user.sensitivity = selectedSensitivity
+        
+        do {
+            try modelContext.save()
+            isEditingProfile = false
+        } catch {
+            print("Failed to save profile changes: \(error)")
+        }
+    }
+    
+    private func updateNotificationSettings() {
+        // Update notification settings in NotificationManager
+        NotificationManager.shared.requestPermission()
+    }
+    
+    private func exportData() {
+        // TODO: Implement data export functionality
+        print("Export data functionality to be implemented")
     }
     
     private func resetProfile() {
@@ -120,6 +320,161 @@ struct SettingsView: View {
             try modelContext.save()
         } catch {
             print("Failed to clear data: \(error)")
+        }
+    }
+    
+    private func sensitivityDescription(_ sensitivity: CaffeineSensitivity) -> String {
+        switch sensitivity {
+        case .low:
+            return "- Less sensitive to crashes"
+        case .medium:
+            return "- Average sensitivity"
+        case .high:
+            return "- More sensitive to crashes"
+        }
+    }
+}
+
+// Authentication View
+struct AuthenticationView: View {
+    @ObservedObject var authState: AuthenticationState
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var email = ""
+    @State private var password = ""
+    @State private var isSignUp = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var isLoading = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 30) {
+                // Logo
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                Text(isSignUp ? "Create Account" : "Welcome Back")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                VStack(spacing: 20) {
+                    // Email Field
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.gray)
+                        TextField("Email", text: $email)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    
+                    // Password Field
+                    HStack {
+                        Image(systemName: "lock")
+                            .foregroundColor(.gray)
+                        SecureField("Password", text: $password)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                }
+                .padding(.horizontal)
+                
+                // Auth Button
+                Button(action: authenticate) {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(10)
+                    } else {
+                        Text(isSignUp ? "Sign Up" : "Sign In")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(10)
+                    }
+                }
+                .padding(.horizontal)
+                .disabled(isLoading)
+                
+                // Toggle Sign In/Up
+                Button(action: {
+                    isSignUp.toggle()
+                }) {
+                    Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                
+                Spacer()
+            }
+            .navigationBarItems(trailing: Button("Cancel") {
+                dismiss()
+            })
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
+        }
+    }
+    
+    private func authenticate() {
+        // Basic validation
+        if email.isEmpty || password.isEmpty {
+            errorMessage = "Please fill in all fields"
+            showError = true
+            return
+        }
+        
+        if !email.contains("@") || !email.contains(".") {
+            errorMessage = "Please enter a valid email"
+            showError = true
+            return
+        }
+        
+        if password.count < 6 {
+            errorMessage = "Password must be at least 6 characters"
+            showError = true
+            return
+        }
+        
+        isLoading = true
+        
+        // Simulate network delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            isLoading = false
+            
+            // For demo purposes, we'll accept any valid email/password
+            authState.signIn(email: email)
+            dismiss()
         }
     }
 }
