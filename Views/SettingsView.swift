@@ -31,6 +31,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var users: [User]
     @StateObject private var authState = AuthenticationState()
+    @StateObject private var storeManager = StoreManager.shared
     
     @State private var showResetConfirmation = false
     @State private var isEditingProfile = false
@@ -40,6 +41,7 @@ struct SettingsView: View {
     @State private var notificationsEnabled = true
     @State private var alertTimeBefore = 30
     @State private var showAuthSheet = false
+    @State private var showPaywall = false
     
     var currentUser: User? {
         users.first(where: { $0.isOnboarded })
@@ -207,13 +209,82 @@ struct SettingsView: View {
                 
                 // Data Management Section
                 Section(header: Text("Data Management")) {
-                    Button(action: exportData) {
-                        Label("Export Data", systemImage: "square.and.arrow.up")
+                    if storeManager.hasAccess(to: .exportData) {
+                        Button(action: exportData) {
+                            Label("Export Data", systemImage: "square.and.arrow.up")
+                        }
+                    } else {
+                        Button(action: { showPaywall = true }) {
+                            HStack {
+                                Label("Export Data", systemImage: "square.and.arrow.up")
+                                Spacer()
+                                Image(systemName: "crown.fill")
+                                    .foregroundColor(.yellow)
+                            }
+                        }
                     }
                     
                     Button(action: clearAllData) {
                         Label("Clear All Data", systemImage: "trash")
                             .foregroundColor(.red)
+                    }
+                }
+                
+                // Premium Section
+                if storeManager.currentTier == .free {
+                    Section {
+                        Button(action: { showPaywall = true }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack {
+                                        Text("Upgrade to Apex Pro")
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                        
+                                        Image(systemName: "crown.fill")
+                                            .foregroundColor(.yellow)
+                                    }
+                                    
+                                    Text("Unlock unlimited history, advanced analytics, and more")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Text("$4.99/mo")
+                                    .font(.headline)
+                                    .foregroundColor(.accentColor)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                } else {
+                    Section(header: Text("Subscription")) {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.yellow)
+                            
+                            VStack(alignment: .leading) {
+                                Text(storeManager.currentTier.displayName)
+                                    .font(.headline)
+                                
+                                Text("Active subscription")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Button("Manage") {
+                                // Open App Store subscription management
+                                if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                            .font(.caption)
+                        }
                     }
                 }
                 
@@ -256,6 +327,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showAuthSheet) {
                 AuthenticationView(authState: authState)
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
             }
             .onAppear {
                 loadUserData()

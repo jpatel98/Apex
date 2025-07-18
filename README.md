@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Platform-iOS%2017.0+-blue.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Swift-5.9-orange.svg" alt="Swift">
   <img src="https://img.shields.io/badge/SwiftUI-5.0-green.svg" alt="SwiftUI">
-  <img src="https://img.shields.io/badge/License-MIT-lightgrey.svg" alt="License">
+  <img src="https://img.shields.io/badge/License-Proprietary-red.svg" alt="License">
 </p>
 
 ## Overview
@@ -186,9 +186,35 @@ Apex takes your privacy seriously:
 - No data is shared without explicit consent
 - No tracking or analytics
 
+## Pricing & Subscription
+
+Apex uses a freemium model with the following tiers:
+
+### Free Tier
+- Basic caffeine tracking and crash prediction
+- 7 days of history
+- Standard notifications
+- Core features for casual users
+
+### Apex Pro ($4.99/month)
+- ✅ Unlimited history tracking
+- ✅ Custom notification settings
+- ✅ Data export (CSV/JSON)
+- ✅ Advanced crash prediction
+
+### Apex Premium ($39.99/year - 33% savings)
+- ✅ Everything in Pro
+- ✅ Multiple user profiles
+- ✅ Apple Watch companion app
+- ✅ Home screen widgets
+- ✅ Advanced analytics dashboard
+- ✅ Priority support
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright (c) 2025 Jigar Patel. All Rights Reserved.
+
+This is proprietary software. No permission is granted to use, copy, modify, or distribute without explicit written permission from the copyright holder.
 
 ## Acknowledgments
 

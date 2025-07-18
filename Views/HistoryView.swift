@@ -3,9 +3,20 @@ import SwiftData
 
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \CaffeineEntry.timestamp, order: .reverse) private var entries: [CaffeineEntry]
+    @Query(sort: \CaffeineEntry.timestamp, order: .reverse) private var allEntries: [CaffeineEntry]
+    @StateObject private var storeManager = StoreManager.shared
     
     @State private var selectedDate = Date()
+    @State private var showPaywall = false
+    
+    var entries: [CaffeineEntry] {
+        // Free users only see last 7 days
+        if !storeManager.hasAccess(to: .unlimitedHistory) {
+            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            return allEntries.filter { $0.timestamp >= sevenDaysAgo }
+        }
+        return allEntries
+    }
     
     var groupedEntries: [Date: [CaffeineEntry]] {
         Dictionary(grouping: entries) { entry in
@@ -19,19 +30,62 @@ struct HistoryView: View {
     
     var body: some View {
         NavigationView {
-            List {
-                ForEach(sortedDates, id: \.self) { date in
-                    Section(header: Text(dateHeader(for: date))) {
-                        ForEach(groupedEntries[date] ?? [], id: \.id) { entry in
-                            EntryRow(entry: entry) {
-                                deleteEntry(entry)
+            VStack {
+                // Premium Banner for Free Users
+                if !storeManager.hasAccess(to: .unlimitedHistory) {
+                    PremiumBanner(
+                        message: "📈 Unlock unlimited history",
+                        description: "See all your caffeine data beyond 7 days"
+                    ) {
+                        showPaywall = true
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                }
+                
+                List {
+                    ForEach(sortedDates, id: \.self) { date in
+                        Section(header: Text(dateHeader(for: date))) {
+                            ForEach(groupedEntries[date] ?? [], id: \.id) { entry in
+                                EntryRow(entry: entry) {
+                                    deleteEntry(entry)
+                                }
                             }
+                        }
+                    }
+                    
+                    // Premium prompt at bottom for free users
+                    if !storeManager.hasAccess(to: .unlimitedHistory) && !sortedDates.isEmpty {
+                        Section {
+                            VStack(spacing: 10) {
+                                Image(systemName: "lock.fill")
+                                    .font(.title)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("Unlock Full History")
+                                    .font(.headline)
+                                
+                                Text("Upgrade to see all your caffeine data")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                
+                                Button("Upgrade Now") {
+                                    showPaywall = true
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
                         }
                     }
                 }
             }
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+            }
         }
     }
     
@@ -105,5 +159,42 @@ struct EntryRow: View {
             return preset.icon
         }
         return "cup.and.saucer"
+    }
+}
+
+struct PremiumBanner: View {
+    let message: String
+    let description: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(message)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.accentColor)
+            }
+            .padding()
+            .background(
+                LinearGradient(
+                    colors: [Color.accentColor.opacity(0.1), Color.purple.opacity(0.1)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
