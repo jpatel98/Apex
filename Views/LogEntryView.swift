@@ -7,6 +7,8 @@ struct LogEntryView: View {
     @Query private var users: [User]
     @Query private var allEntries: [CaffeineEntry]
     
+    @Binding var selectedTab: Int
+    
     @State private var currentStep = 0
     @State private var selectedDrink: String = ""
     @State private var caffeineAmount: Double = 0
@@ -16,9 +18,18 @@ struct LogEntryView: View {
     @State private var selectedMinute = Calendar.current.component(.minute, from: Date())
     @State private var isToday = true
     @State private var showSuccessAnimation = false
+    @State private var stepOpacity = 1.0
+    @State private var stepOffset: CGFloat = 0
     
     var currentUser: User? {
         users.first(where: { $0.isOnboarded })
+    }
+    
+    var currentDailyTotal: Double {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todayEntries = allEntries.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
+        return todayEntries.reduce(0) { $0 + $1.caffeineAmountMg }
     }
     
     let drinkEmojis = [
@@ -46,26 +57,28 @@ struct LogEntryView: View {
             ZStack {
                 // Gradient background
                 LinearGradient(
-                    colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
+                    colors: [Color.blue, Color.purple],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .ignoresSafeArea()
+                    .opacity(0.1)
+                    .ignoresSafeArea()
                 
-                VStack(spacing: 30) {
-                    // Progress indicator
-                    HStack(spacing: 8) {
+                VStack(spacing: 24) {
+                    // Progress indicator with better styling
+                    HStack(spacing: 12) {
                         ForEach(0..<4) { index in
                             Circle()
-                                .fill(index <= currentStep ? Color.accentColor : Color.gray.opacity(0.3))
-                                .frame(width: 8, height: 8)
-                                .animation(.easeInOut, value: currentStep)
+                                .fill(index == currentStep ? Color.accentColor : Color.gray.opacity(0.2))
+                                .frame(width: index == currentStep ? 10 : 8, height: index == currentStep ? 10 : 8)
+                                .scaleEffect(index == currentStep ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentStep)
                         }
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 16)
                     
                     // Question content
-                    VStack(spacing: 40) {
+                    VStack(spacing: 32) {
                         if currentStep == 0 {
                             drinkSelectionView
                         } else if currentStep == 1 {
@@ -73,70 +86,128 @@ struct LogEntryView: View {
                         } else if currentStep == 2 {
                             timeSelectionView
                         } else if currentStep == 3 {
-                            confirmationView
+                            VStack(spacing: 20) {
+                                confirmationView
+                                
+                                // Safety warning before logging
+                                if let user = currentUser {
+                                    LogSafetyWarning(
+                                        plannedAmount: selectedDrink == "Custom" ? (Double(customCaffeineAmount) ?? 0) : caffeineAmount,
+                                        currentDailyTotal: currentDailyTotal,
+                                        userWeight: user.weightKg
+                                    )
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal)
+                    .opacity(stepOpacity)
+                    .offset(x: stepOffset)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: currentStep)
                     
                     Spacer()
                     
                     // Navigation buttons
-                    HStack(spacing: 20) {
+                    VStack(spacing: 12) {
+                        // Main action button
+                        Button(action: handleNextAction) {
+                            HStack {
+                                Text(currentStep == 3 ? "Log It!" : "Next")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                if currentStep < 3 {
+                                    Image(systemName: "chevron.right")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(22)
+                            .shadow(color: Color.blue.opacity(0.4), radius: 12, x: 0, y: 6)
+                        }
+                        .disabled(!canProceed)
+                        .opacity(canProceed ? 1 : 0.5)
+                        .scaleEffect(canProceed ? 1 : 0.95)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canProceed)
+                        
+                        // Back button
                         if currentStep > 0 {
                             Button(action: { 
                                 withAnimation(.spring()) {
                                     currentStep -= 1
                                 }
                             }) {
-                                Text("Back")
-                                    .font(.headline)
-                                    .foregroundColor(.gray)
-                                    .frame(width: 100, height: 50)
-                                    .background(Color.gray.opacity(0.1))
-                                    .cornerRadius(25)
+                                HStack {
+                                    Image(systemName: "chevron.left")
+                                        .font(.callout)
+                                        .fontWeight(.medium)
+                                    Text("Back")
+                                        .font(.callout)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(.secondary)
+                                .frame(height: 40)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(Color(.systemGray6))
+                                        .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+                                )
                             }
                         }
-                        
-                        Button(action: handleNextAction) {
-                            Text(currentStep == 3 ? "Log It!" : "Next")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(width: currentStep == 3 ? 200 : 100, height: 50)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color.blue, Color.purple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(25)
-                        }
-                        .disabled(!canProceed)
-                        .opacity(canProceed ? 1 : 0.5)
                     }
-                    .padding(.bottom, 30)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, UIDevice.current.userInterfaceIdiom == .pad ? 120 : 100)
+                }
+                .navigationTitle("Log Caffeine")
+                .navigationBarTitleDisplayMode(.inline)
+                .overlay(
+                    Group {
+                        if showSuccessAnimation {
+                            SuccessAnimation()
+                        }
+                    }
+                )
+                .onAppear {
+                    // Reset form each time view appears
+                    if !showSuccessAnimation {
+                        resetForm()
+                    }
                 }
             }
-            .navigationTitle("Log Caffeine")
-            .navigationBarTitleDisplayMode(.inline)
-            .overlay(
-                Group {
-                    if showSuccessAnimation {
-                        SuccessAnimation()
-                    }
-                }
-            )
         }
     }
     
     var drinkSelectionView: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
             Text("What did you drink?")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(.title)
+                .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.primary, Color.primary.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+            LazyVGrid(
+                columns: UIDevice.current.userInterfaceIdiom == .pad ? 
+                    [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())] :
+                    [GridItem(.flexible()), GridItem(.flexible())], 
+                spacing: 15
+            ) {
                 ForEach(DrinkPreset.presets, id: \.name) { preset in
                     DrinkButton(
                         name: preset.name,
@@ -171,17 +242,27 @@ struct LogEntryView: View {
     var caffeineAmountView: some View {
         VStack(spacing: 25) {
             Text(selectedDrink == "Custom" ? "Tell me about your drink" : "Confirm the caffeine")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(.title)
+                .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.primary, Color.primary.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
             if selectedDrink == "Custom" {
                 VStack(spacing: 20) {
                     TextField("Drink name", text: $customDrinkName)
                         .font(.title2)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(15)
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.systemGray6))
+                                .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+                        )
                     
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Caffeine amount")
@@ -193,9 +274,12 @@ struct LogEntryView: View {
                                 .font(.title)
                                 .keyboardType(.numberPad)
                                 .frame(width: 100)
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(15)
+                                .padding(16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(.systemGray6))
+                                        .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+                                )
                             
                             Text("mg")
                                 .font(.title2)
@@ -208,9 +292,34 @@ struct LogEntryView: View {
                     Text("\(drinkEmojis[selectedDrink] ?? "☕")")
                         .font(.system(size: 80))
                     
-                    Text("\(Int(caffeineAmount)) mg")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundColor(drinkColors[selectedDrink] ?? .blue)
+                    VStack(spacing: 15) {
+                        HStack {
+                            TextField("\(Int(caffeineAmount))", value: $caffeineAmount, format: .number)
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundColor(drinkColors[selectedDrink] ?? .blue)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 120)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(drinkColors[selectedDrink]?.opacity(0.3) ?? Color.blue.opacity(0.3), lineWidth: 2)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(drinkColors[selectedDrink]?.opacity(0.05) ?? Color.blue.opacity(0.05))
+                                        )
+                                )
+                            
+                            Text("mg")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Tap to adjust")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     
                     Text("of caffeine")
                         .font(.title2)
@@ -223,9 +332,16 @@ struct LogEntryView: View {
     var timeSelectionView: some View {
         VStack(spacing: 25) {
             Text("When did you have it?")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(.title)
+                .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.primary, Color.primary.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
             VStack(spacing: 20) {
                 // Today/Yesterday toggle
@@ -301,8 +417,15 @@ struct LogEntryView: View {
     var confirmationView: some View {
         VStack(spacing: 30) {
             Text("Ready to log!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(.title)
+                .fontWeight(.semibold)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.primary, Color.primary.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
             VStack(spacing: 20) {
                 HStack {
@@ -365,12 +488,52 @@ struct LogEntryView: View {
     }
     
     func handleNextAction() {
+        let feedback = UISelectionFeedbackGenerator()
+        feedback.selectionChanged()
+        
         if currentStep < 3 {
-            withAnimation(.spring()) {
+            // Animate out current step
+            withAnimation(.easeInOut(duration: 0.2)) {
+                stepOpacity = 0
+                stepOffset = -30
+            }
+            
+            // Wait then animate in next step
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 currentStep += 1
+                stepOffset = 30
+                
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    stepOpacity = 1
+                    stepOffset = 0
+                }
             }
         } else {
             logEntry()
+        }
+    }
+    
+    func handlePreviousAction() {
+        guard currentStep > 0 else { return }
+        
+        let feedback = UISelectionFeedbackGenerator()
+        feedback.selectionChanged()
+        
+        // Animate out current step
+        withAnimation(.easeInOut(duration: 0.2)) {
+            stepOpacity = 0
+            stepOffset = 30
+        }
+        
+        // Wait then animate in previous step
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            currentStep -= 1
+            stepOffset = -30
+            
+            withAnimation(.easeInOut(duration: 0.3)) {
+                stepOpacity = 1
+                stepOffset = 0
+            }
         }
     }
     
@@ -408,17 +571,40 @@ struct LogEntryView: View {
                 NotificationManager.shared.updateCrashAlert(entries: recentEntries, sensitivity: user.sensitivity)
             }
             
-            withAnimation(.spring()) {
+            let feedback = UINotificationFeedbackGenerator()
+            feedback.notificationOccurred(.success)
+            
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 showSuccessAnimation = true
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 showSuccessAnimation = false
-                dismiss()
+                // Reset state before switching tabs
+                resetForm()
+                withAnimation(.spring()) {
+                    selectedTab = 0 // Switch to dashboard
+                }
             }
         } catch {
+            let feedback = UINotificationFeedbackGenerator()
+            feedback.notificationOccurred(.error)
+            // TODO: Show error alert to user
             print("Failed to save entry: \(error)")
         }
+    }
+    
+    private func resetForm() {
+        currentStep = 0
+        selectedDrink = ""
+        caffeineAmount = 0
+        customDrinkName = ""
+        customCaffeineAmount = ""
+        selectedHour = Calendar.current.component(.hour, from: Date())
+        selectedMinute = Calendar.current.component(.minute, from: Date())
+        isToday = true
+        stepOpacity = 1.0
+        stepOffset = 0
     }
 }
 
@@ -432,12 +618,13 @@ struct DrinkButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text(emoji)
-                    .font(.system(size: 40))
+                    .font(.system(size: 32))
                 
                 Text(name)
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                     .multilineTextAlignment(.center)
                 
                 if caffeineAmount > 0 {
@@ -447,61 +634,176 @@ struct DrinkButton: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 120)
+            .frame(maxWidth: .infinity, minHeight: 90)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? color.opacity(0.2) : Color.gray.opacity(0.1))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? color.opacity(0.15) : Color(.systemBackground))
+                    .shadow(color: isSelected ? color.opacity(0.3) : Color.black.opacity(0.05), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 4 : 2)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? color : Color.clear, lineWidth: 3)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? color.opacity(0.8) : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
             )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
 struct SuccessAnimation: View {
-    @State private var scale = 0.5
-    @State private var opacity = 1.0
-    @State private var rotation = 0.0
+    @State private var opacity = 0.0
+    @State private var offset: CGFloat = 20
     
     var body: some View {
         VStack {
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.2))
-                    .frame(width: 150, height: 150)
-                    .scaleEffect(scale * 1.5)
-                
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.green)
-                    .scaleEffect(scale)
-                    .rotationEffect(.degrees(rotation))
-            }
+            Spacer()
             
-            Text("Logged!")
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.green)
-                .opacity(opacity)
-                .offset(y: 20)
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("Added")
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.8))
+            )
+            .opacity(opacity)
+            .offset(y: offset)
+            
+            Spacer()
+                .frame(height: 100)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.3))
+        .allowsHitTesting(false)
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                scale = 1.0
-                rotation = 360
+            withAnimation(.easeOut(duration: 0.3)) {
+                opacity = 1.0
+                offset = 0
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                withAnimation(.easeOut(duration: 0.3)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeIn(duration: 0.2)) {
                     opacity = 0.0
+                    offset = -10
                 }
             }
+        }
+    }
+}
+
+struct LogSafetyWarning: View {
+    let plannedAmount: Double
+    let currentDailyTotal: Double
+    let userWeight: Double
+    
+    var newTotal: Double {
+        currentDailyTotal + plannedAmount
+    }
+    
+    var shouldShowWarning: Bool {
+        let warningLevel = userWeight * 4.5
+        return newTotal > warningLevel || plannedAmount > 200
+    }
+    
+    var warningType: LogWarningType {
+        let dailyLimit = userWeight * 5.7
+        
+        if newTotal > (userWeight * 15) {
+            return .danger
+        } else if newTotal > dailyLimit {
+            return .overLimit
+        } else if plannedAmount > 200 {
+            return .highSingleDose
+        } else {
+            return .approaching
+        }
+    }
+    
+    var body: some View {
+        Group {
+            if shouldShowWarning {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text(warningType.emoji)
+                            .font(.title3)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(warningType.title)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(warningType.color)
+                            
+                            Text(warningMessage)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [warningType.color.opacity(0.05), warningType.color.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+            }
+        }
+    }
+    
+    var warningMessage: String {
+        let dailyLimit = Int(userWeight * 5.7)
+        
+        switch warningType {
+        case .danger:
+            return "This would put you at \(Int(newTotal))mg today. That's quite a lot!"
+        case .overLimit:
+            return "This brings you to \(Int(newTotal))mg (limit: \(dailyLimit)mg)"
+        case .highSingleDose:
+            return "\(Int(plannedAmount))mg is a strong dose. You might feel jittery."
+        case .approaching:
+            return "This brings you to \(Int(newTotal))mg of \(dailyLimit)mg today"
+        }
+    }
+}
+
+enum LogWarningType {
+    case approaching, overLimit, highSingleDose, danger
+    
+    var emoji: String {
+        switch self {
+        case .approaching: return "⚠️"
+        case .overLimit: return "🚨"
+        case .highSingleDose: return "💪"
+        case .danger: return "🛑"
+        }
+    }
+    
+    var title: String {
+        switch self {
+        case .approaching: return "Getting Close"
+        case .overLimit: return "Over Your Limit"
+        case .highSingleDose: return "Strong Dose"
+        case .danger: return "Very High Amount"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .approaching: return .orange
+        case .overLimit: return .red
+        case .highSingleDose: return .blue
+        case .danger: return .red
         }
     }
 }
