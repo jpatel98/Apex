@@ -8,9 +8,25 @@ enum CaffeineSensitivity: String, CaseIterable, Codable {
     
     var displayName: String {
         switch self {
-        case .low: return "Low"
-        case .medium: return "Medium"
-        case .high: return "High"
+        case .low: return "Caffeine Veteran"
+        case .medium: return "Regular Coffee Drinker"
+        case .high: return "Caffeine Sensitive"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .low: return "I can drink coffee at night and still sleep fine"
+        case .medium: return "I avoid coffee after 2-3 PM"
+        case .high: return "Even morning coffee can make me jittery"
+        }
+    }
+    
+    var emoji: String {
+        switch self {
+        case .low: return "💪"
+        case .medium: return "☕"
+        case .high: return "⚡"
         }
     }
     

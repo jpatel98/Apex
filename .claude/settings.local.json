@@ -5,7 +5,13 @@
       "Bash(xcodebuild:*)",
       "Bash(xcrun simctl list:*)",
       "Bash(git commit:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(swift build:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:www.caffeineinformer.com)",
+      "WebFetch(domain:benclarkxyz.github.io)",
+      "Bash(swift:*)"
     ],
     "deny": []
   }

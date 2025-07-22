@@ -18,6 +18,10 @@
 		1D36233C0E83FDDA00981E51 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D36233B0E83FDDA00981E51 /* MainTabView.swift */; };
 		1D36233E0E83FDDA00981E51 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D36233D0E83FDDA00981E51 /* OnboardingView.swift */; };
 		1D3623400E83FDDA00981E51 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D36233F0E83FDDA00981E51 /* DashboardView.swift */; };
+
+				6F739CD92F4F40889089E7DC /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426CD961259B47F280CD3072 /* Constants.swift */; };
+
+				426CD961259B47F280CD3072 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		1D3623420E83FDDA00981E51 /* LogEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3623410E83FDDA00981E51 /* LogEntryView.swift */; };
 		1D3623440E83FDDA00981E51 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3623430E83FDDA00981E51 /* HistoryView.swift */; };
 		1D3623460E83FDDA00981E51 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3623450E83FDDA00981E51 /* SettingsView.swift */; };

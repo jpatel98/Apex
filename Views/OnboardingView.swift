@@ -48,22 +48,32 @@ struct OnboardingView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("Caffeine Sensitivity", systemImage: "gauge")
+                        Label("How does caffeine affect you?", systemImage: "sparkles")
                             .font(.headline)
                         
-                        VStack(alignment: .leading, spacing: 5) {
+                        Text("This helps us predict when you'll crash")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 5)
+                        
+                        VStack(spacing: 12) {
                             ForEach(CaffeineSensitivity.allCases, id: \.self) { sensitivity in
                                 Button(action: {
                                     selectedSensitivity = sensitivity
                                 }) {
-                                    HStack {
-                                        VStack(alignment: .leading) {
+                                    HStack(spacing: 15) {
+                                        Text(sensitivity.emoji)
+                                            .font(.title)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
                                             Text(sensitivity.displayName)
-                                                .font(.body)
+                                                .font(.subheadline)
                                                 .fontWeight(selectedSensitivity == sensitivity ? .semibold : .regular)
-                                            Text("Half-life: \(Int(sensitivity.halfLifeHours)) hours")
+                                                .foregroundColor(.primary)
+                                            Text(sensitivity.description)
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
+                                                .fixedSize(horizontal: false, vertical: true)
                                         }
                                         
                                         Spacer()
@@ -71,12 +81,17 @@ struct OnboardingView: View {
                                         if selectedSensitivity == sensitivity {
                                             Image(systemName: "checkmark.circle.fill")
                                                 .foregroundColor(.accentColor)
+                                                .font(.title3)
                                         }
                                     }
-                                    .padding()
+                                    .padding(16)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(selectedSensitivity == sensitivity ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.1))
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(selectedSensitivity == sensitivity ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(selectedSensitivity == sensitivity ? Color.accentColor : Color.clear, lineWidth: 2)
+                                            )
                                     )
                                 }
                                 .buttonStyle(PlainButtonStyle())

@@ -114,22 +114,44 @@ struct SettingsView: View {
                                 .frame(width: 100)
                             }
                             
-                            VStack(alignment: .leading) {
-                                Label("Caffeine Sensitivity", systemImage: "gauge")
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label("How caffeine affects you", systemImage: "sparkles")
                                     .padding(.bottom, 5)
                                 
-                                Picker("Sensitivity", selection: $selectedSensitivity) {
-                                    ForEach(CaffeineSensitivity.allCases, id: \.self) { sensitivity in
-                                        HStack {
-                                            Text(sensitivity.displayName)
-                                            Text(sensitivityDescription(sensitivity))
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
+                                ForEach(CaffeineSensitivity.allCases, id: \.self) { sensitivity in
+                                    Button(action: {
+                                        selectedSensitivity = sensitivity
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            Text(sensitivity.emoji)
+                                                .font(.title3)
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(sensitivity.displayName)
+                                                    .font(.footnote)
+                                                    .fontWeight(selectedSensitivity == sensitivity ? .semibold : .regular)
+                                                    .foregroundColor(.primary)
+                                                Text(sensitivity.description)
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            if selectedSensitivity == sensitivity {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(.accentColor)
+                                                    .font(.footnote)
+                                            }
                                         }
-                                        .tag(sensitivity)
+                                        .padding(12)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(selectedSensitivity == sensitivity ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+                                        )
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .pickerStyle(DefaultPickerStyle())
                             }
                             
                             HStack {
@@ -403,14 +425,7 @@ struct SettingsView: View {
     }
     
     private func sensitivityDescription(_ sensitivity: CaffeineSensitivity) -> String {
-        switch sensitivity {
-        case .low:
-            return "- Less sensitive to crashes"
-        case .medium:
-            return "- Average sensitivity"
-        case .high:
-            return "- More sensitive to crashes"
-        }
+        return ""  // Description is now in the model
     }
 }
 
