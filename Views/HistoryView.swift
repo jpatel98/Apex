@@ -12,17 +12,22 @@ extension UserDefaults {
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CaffeineEntry.timestamp, order: .reverse) private var allEntries: [CaffeineEntry]
+    @Query private var users: [User]
     
     @State private var selectedDate = Date()
     @State private var showUpgradeAlert = false
     
+    var currentUser: User? {
+        users.first(where: { $0.isOnboarded })
+    }
+
     var entries: [CaffeineEntry] {
         // Free users only see last 7 days
         if !UserDefaults.isPremiumUser {
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-            return allEntries.filter { $0.timestamp >= sevenDaysAgo }
+            return allEntries.filter { $0.timestamp >= sevenDaysAgo && (currentUser == nil || $0.userID == currentUser!.id) }
         }
-        return allEntries
+        return allEntries.filter { currentUser == nil || $0.userID == currentUser!.id }
     }
     
     var groupedEntries: [Date: [CaffeineEntry]] {

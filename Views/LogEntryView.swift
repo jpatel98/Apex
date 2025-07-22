@@ -24,11 +24,16 @@ struct LogEntryView: View {
     var currentUser: User? {
         users.first(where: { $0.isOnboarded })
     }
+
+    var userEntries: [CaffeineEntry] {
+        guard let user = currentUser else { return [] }
+        return allEntries.filter { $0.userID == user.id }
+    }
     
     var currentDailyTotal: Double {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let todayEntries = allEntries.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
+        let todayEntries = userEntries.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
         return todayEntries.reduce(0) { $0 + $1.caffeineAmountMg }
     }
     
@@ -538,7 +543,7 @@ struct LogEntryView: View {
     }
     
     private func logEntry() {
-        guard currentUser != nil else { return }
+        guard let user = currentUser else { return }
         
         let calendar = Calendar.current
         var components = DateComponents()
@@ -556,9 +561,9 @@ struct LogEntryView: View {
         
         if selectedDrink == "Custom" {
             guard let amount = Double(customCaffeineAmount) else { return }
-            entry = CaffeineEntry(drinkName: customDrinkName, caffeineAmountMg: amount, timestamp: date)
+            entry = CaffeineEntry(drinkName: customDrinkName, caffeineAmountMg: amount, timestamp: date, userID: user.id)
         } else {
-            entry = CaffeineEntry(drinkName: selectedDrink, caffeineAmountMg: caffeineAmount, timestamp: date)
+            entry = CaffeineEntry(drinkName: selectedDrink, caffeineAmountMg: caffeineAmount, timestamp: date, userID: user.id)
         }
         
         modelContext.insert(entry)

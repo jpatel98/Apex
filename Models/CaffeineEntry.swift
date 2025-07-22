@@ -7,12 +7,14 @@ final class CaffeineEntry {
     var drinkName: String
     var caffeineAmountMg: Double
     var timestamp: Date
+    var userID: UUID
     
-    init(drinkName: String, caffeineAmountMg: Double, timestamp: Date = Date()) {
+    init(drinkName: String, caffeineAmountMg: Double, timestamp: Date = Date(), userID: UUID) {
         self.id = UUID()
         self.drinkName = drinkName
         self.caffeineAmountMg = caffeineAmountMg
         self.timestamp = timestamp
+        self.userID = userID
     }
 }
 

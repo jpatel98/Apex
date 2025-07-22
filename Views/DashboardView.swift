@@ -14,8 +14,13 @@ struct DashboardView: View {
         users.first(where: { $0.isOnboarded })
     }
     
+    var userEntries: [CaffeineEntry] {
+        guard let user = currentUser else { return [] }
+        return allEntries.filter { $0.userID == user.id }
+    }
+    
     var recentEntries: [CaffeineEntry] {
-        CaffeineCalculator.getRecentEntries(allEntries, within: 24)
+        CaffeineCalculator.getRecentEntries(userEntries, within: 24)
     }
     
     var currentCaffeineLevel: Double {
@@ -149,7 +154,7 @@ struct DashboardView: View {
     var todayEntries: [CaffeineEntry] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        return allEntries.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
+        return userEntries.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
     }
     
     var totalCaffeineToday: Double {
@@ -158,7 +163,7 @@ struct DashboardView: View {
     
     var averageDailyCaffeine: Double {
         let thirtyDaysAgo = Date().addingTimeInterval(-30 * 24 * 3600)
-        let recentEntries = allEntries.filter { $0.timestamp > thirtyDaysAgo }
+        let recentEntries = userEntries.filter { $0.timestamp > thirtyDaysAgo }
         
         guard !recentEntries.isEmpty else { return 0 }
         
